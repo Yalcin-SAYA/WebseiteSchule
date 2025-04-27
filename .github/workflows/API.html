@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wetterdaten mit Graph</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #e0f2f1; /* Standardfarbe */
+      display: flex;
+      flex-direction: column;
+    }
+
+    h1 {
+      color: #333;
+      text-align: center;
+    }
+
+    input, button {
+      padding: 10px;
+      margin-right: 10px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+
+    button {
+      background-color: #007BFF;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    .weather-card {
+      margin-top: 20px;
+      padding: 15px;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+
+    .weather-info {
+      flex: 1 1 300px;
+    }
+
+    .weather-icon {
+      font-size: 30px;
+      margin-right: 10px;
+      vertical-align: middle;
+    }
+
+    .pulsing {
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.2); opacity: 0.7; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    .icon-cloud { color: #888; }
+    .icon-sun { color: #FFA500; }
+    .icon-temp { color: #FF4500; }
+    .icon-humidity { color: #1E90FF; }
+    .icon-wind { color: #00CED1; }
+    .icon-pressure { color: #8B0000; }
+    .icon-uv { color: #FFD700; }
+    .icon-feels { color: #FF69B4; }
+    .icon-rain { color: #1E90FF; }
+
+    canvas {
+      max-width: 400px;
+      margin-top: 20px;
+    }
+
+    .remove-btn {
+      margin-top: 10px;
+      padding: 8px 12px;
+      border: none;
+      background: #dc3545;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .remove-btn:hover {
+      background: #c82333;
+    }
+
+    /* Sidebar Menü */
+    .sidebar {
+      height: 100%;
+      width: 200px;
+      position: fixed;
+      top: 0;
+      left: 0;
+      background-color: #333;
+      padding-top: 20px;
+      z-index: 100;
+    }
+
+    .sidebar ul {
+      list-style-type: none;
+      padding: 0;
+    }
+
+    .sidebar li {
+      padding: 10px;
+    }
+
+    .sidebar a {
+      color: white;
+      text-decoration: none;
+      display: block;
+    }
+
+    .sidebar a:hover {
+      background-color: #575757;
+    }
+
+    /* Hauptinhalt */
+    .content {
+      margin-left: 220px;
+      padding: 20px;
+    }
+
+    /* Hotspot-Karten */
+    .hotspot-city {
+      display: inline-block;
+      margin: 10px;
+      padding: 15px;
+      background-color: #007BFF;
+      color: white;
+      border-radius: 10px;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    .hotspot-city:hover {
+      background-color: #0056b3;
+    }
+
+    /* Popup-Fenster für Einstellungen */
+    .settings-popup {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      z-index: 200;
+      width: 300px;
+      text-align: center;
+    }
+
+    .settings-popup select {
+      margin-top: 10px;
+      width: 100%;
+      padding: 10px;
+      border-radius: 5px;
+    }
+
+    .popup-close-btn {
+      margin-top: 20px;
+      padding: 10px;
+      background-color: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .popup-close-btn:hover {
+      background-color: #c82333;
+    }
+
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar Menü -->
+  <div class="sidebar">
+    <ul>
+      <li><a href="#" onclick="showWeatherOverview()">Wetterübersicht</a></li>
+      <li><a href="#" onclick="showSettings()">Einstellungen</a></li>
+      <li><a href="https://weatherstack.com/" target="_blank">Hilfe</a></li>
+      <li><a href="#" onclick="showAboutUs()">Über Uns</a></li>
+    </ul>
+  </div>
+
+  <!-- Hauptinhalt -->
+  <div class="content">
+    <h1>Wetterdaten von WeatherStack</h1>
+    
+    <!-- Wetterformular -->
+    <div id="weather-form" style="display: none;">
+      <input type="text" id="city" placeholder="Stadt eingeben" />
+      <button onclick="getWeatherData()">Wetter abrufen</button>
+    </div>
+
+    <div id="weatherList"></div>
+
+    <h2>Hotspot Städte</h2>
+    <div id="hotspotCities">
+      <div class="hotspot-city" onclick="getWeatherData('Wien')">Wien</div>
+      <div class="hotspot-city" onclick="getWeatherData('Graz')">Graz</div>
+      <div class="hotspot-city" onclick="getWeatherData('Salzburg')">Salzburg</div>
+      <div class="hotspot-city" onclick="getWeatherData('Innsbruck')">Innsbruck</div>
+    </div>
+  </div>
+
+  <!-- Einstellungs-Popup -->
+  <div id="settings-popup" class="settings-popup">
+    <h2>Farben ändern</h2>
+    <p>Wähle eine Hintergrundfarbe:</p>
+    <select id="color-select">
+      <option value="#e0f2f1">Standardfarbe</option>
+      <option value="black">Schwarz</option>
+      <option value="white">Weiß</option>
+    </select>
+    <br>
+    <button class="popup-close-btn" onclick="closeSettings()">Schließen</button>
+  </div>
+
+  <script>
+    // Funktion zum Abrufen von Wetterdaten für eine Stadt
+    function getWeatherData(city = null) {
+      if (!city) {
+        city = document.getElementById('city').value.trim();
+        if (!city) return;
+      }
+
+      const apiKey = '6856879e32b8e92ee6341f7020a2852e';
+      const url = `http://api.weatherstack.com/current?access_key=${apiKey}&query=${city}`;
+
+      fetch(url)
+        .then(response => response.json())
+        .then(data => {
+          if (data.success === false) {
+            alert(`Fehler: ${data.error.info}`);
+          } else {
+            const current = data.current;
+            const desc = current.weather_descriptions[0];
+
+            let iconClass = 'fa-sun icon-sun';
+            if (desc.toLowerCase().includes("cloud") || desc.toLowerCase().includes("bewölkt")) {
+              iconClass = 'fa-cloud icon-cloud';
+            } else if (desc.toLowerCase().includes("rain") || desc.toLowerCase().includes("regen")) {
+              iconClass = 'fa-cloud-showers-heavy icon-cloud';
+            }
+
+            const cardId = `card-${Date.now()}`;
+            const chartId = `chart-${Date.now()}`;
+
+            const html = `
+              <div id="${cardId}" class="weather-card">
+                <div class="weather-info">
+                  <h2>Wetter in ${data.location.name}</h2>
+                  <p><i class="fa-solid ${iconClass} weather-icon pulsing"></i>${desc}</p>
+                  <p><i class="fa-solid fa-temperature-half weather-icon icon-temp pulsing"></i> Temperatur: ${current.temperature}°C</p>
+                  <p><i class="fa-solid fa-droplet weather-icon icon-humidity pulsing"></i> Luftfeuchtigkeit: ${current.humidity}%</p>
+                  <p><i class="fa-solid fa-wind weather-icon icon-wind pulsing"></i> Wind: ${current.wind_speed} km/h, Richtung: ${current.wind_dir}</p>
+                  <p><i class="fa-solid fa-gauge-high weather-icon icon-pressure pulsing"></i> Luftdruck: ${current.pressure} mbar</p>
+                  <p><i class="fa-solid fa-sun-plant-wilt weather-icon icon-uv pulsing"></i> UV-Index: ${current.uv_index}</p>
+                  <p><i class="fa-solid fa-cloud-rain weather-icon icon-rain pulsing"></i> Niederschlag: ${current.precip} mm</p>
+                  <p><i class="fa-solid fa-temperature-low weather-icon icon-feels pulsing"></i> Gefühlte Temperatur: ${current.feelslike}°C</p>
+                  <p><i class="fa-solid fa-clock weather-icon"></i> Letzte Messung: ${data.location.localtime}</p>
+                  <button class="remove-btn" onclick="removeCard('${cardId}')">Entfernen</button>
+                </div>
+                <div>
+                  <canvas id="${chartId}" width="400" height="300"></canvas>
+                </div>
+              </div>
+            `;
+
+            document.getElementById('weatherList').insertAdjacentHTML('beforeend', html);
+
+            const ctx = document.getElementById(chartId).getContext('2d');
+            new Chart(ctx, {
+              type: 'bar',
+              data: {
+                labels: ['Wind (km/h)', 'Luftdruck (mbar)', 'UV-Index', 'Regen (mm)', 'Gefühlt (°C)'],
+                datasets: [{
+                  label: 'Wetterdaten',
+                  data: [
+                    current.wind_speed,
+                    current.pressure,
+                    current.uv_index,
+                    current.precip,
+                    current.feelslike
+                  ],
+                  backgroundColor: [
+                    '#00CED1', '#8B0000', '#FFD700', '#1E90FF', '#FF69B4'
+                  ],
+                  borderRadius: 10
+                }]
+              },
+              options: {
+                responsive: false,
+                plugins: {
+                  legend: { display: false }
+                },
+                scales: {
+                  y: { beginAtZero: true }
+                }
+              }
+            });
+          }
+        })
+        .catch(error => {
+          alert(`Fehler beim Abrufen der Wetterdaten: ${error}`);
+        });
+
+      document.getElementById('city').value = '';
+    }
+
+    // Funktion zum Entfernen der Karten
+    function removeCard(cardId) {
+      const card = document.getElementById(cardId);
+      if (card) card.remove();
+    }
+
+    // Menüfunktionen
+    function showWeatherOverview() {
+      document.getElementById("weather-form").style.display = "block";
+    }
+
+    function showSettings() {
+      document.getElementById('settings-popup').style.display = 'block';
+    }
+
+    function closeSettings() {
+      document.getElementById('settings-popup').style.display = 'none';
+    }
+
+    // Funktion zum Farbwechsel
+    document.getElementById('color-select').addEventListener('change', function(event) {
+      document.body.style.backgroundColor = event.target.value;
+    });
+
+    function showAboutUs() {
+      alert("Diese Webseite ist ein Schulprojekt, das es Nutzern ermöglicht, Wetterdaten für verschiedene Städte abzurufen.");
+    }
+  </script>
+
+</body>
+</html>
